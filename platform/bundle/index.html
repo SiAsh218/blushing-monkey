@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Platform</title>
+    <style>
+      body {
+        margin: 0;
+        background-color: black;
+      }
+
+      .container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+
+      #my-canvas {
+        background-color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <canvas id="my-canvas"></canvas>
+    </div>
+    <script>
+      class Game {
+        constructor(platforms, player, canvas) {
+          this.platforms = platforms;
+          this.player = player;
+          this.gravity = 1.2;
+          this.fps = 60; // for fps calculation
+          this.fpsInterval; // for fps calculation
+          this.last; // for fps calculation
+          this.startTime; // for fps calculation
+          this.now; // for fps calculation
+          this.elapsed; // for fps calculation
+          this.canvas = canvas;
+        }
+
+        // method to initiate the game
+        init() {
+          // get fps interval in ms
+          this.fpsInterval = 1000 / this.fps;
+          //   // set last and start frame time to now
+          this.last = Date.now();
+          this.startTime = this.last;
+
+          this.animate();
+        }
+
+        // method to stabilise the framerate
+        applyFPS() {
+          this.now = Date.now();
+          // calculate ms elapsed since last frame
+          this.elapsed = this.now - this.last;
+
+          // if elapsed hasn't exceeded the fps interval return
+          if (this.elapsed < this.fpsInterval) {
+            this.screenRefreshNeeded = false;
+            return;
+          }
+
+          // set last to now
+          this.last = this.now;
+          this.screenRefreshNeeded = true;
+        }
+
+        // method to animate the game
+        animate() {
+          requestAnimationFrame(this.animate.bind(this));
+
+          this.applyFPS();
+
+          if (!this.screenRefreshNeeded) return;
+
+          this.canvas.clearCanvas();
+
+          this.platforms.forEach((platform) => platform.draw());
+
+          this.player.update();
+        }
+      }
+
+      class Player {
+        constructor({
+          position,
+          width,
+          height,
+          platforms,
+          canvas,
+          keysHandler,
+        }) {
+          this.platforms = platforms;
+          this.canvas = canvas;
+          this.gravity = 1.2;
+          this.keysHandler = keysHandler;
+          this.position = position;
+          this.width = width || 20;
+          this.height = height || 30;
+          this.velocity = { x: 0, y: 0 };
+          this.lives = 3;
+          this.isGrounded = false;
+          this.maxRunSpeed = 4;
+          this.runAcceleration = 0.2;
+          this.currentSpeed = 0;
+          this.jumpHeight = 15;
+          this.isDead = false;
+        }
+
+        update() {
+          this.detectPlatform();
+
+          if (!this.isGrounded) this.applyGravity();
+
+          this.draw();
+          this.move();
+        }
+
+        // method to draw the player
+        draw() {
+          this.canvas.ctx.fillStyle = "RGBA(0, 255, 0, 0.5)";
+          this.canvas.ctx.strokeStyle = "black";
+          this.canvas.ctx.fillRect(
+            this.position.x,
+            this.position.y,
+            this.width,
+            this.height
+          );
+        }
+
+        getRightPosition() {
+          return this.position.x + this.width;
+        }
+
+        setRightPosition(position) {
+          this.position.x = position - this.width;
+        }
+
+        getLeftPosition() {
+          return this.position.x;
+        }
+
+        setLeftPosition(position) {
+          this.position.x = position;
+        }
+
+        getBottomPosition() {
+          return this.position.y + this.height;
+        }
+
+        setBottomPosition(position) {
+          this.position.y = position - this.height;
+        }
+
+        getTopPosition() {
+          return this.position.y;
+        }
+
+        setTopPosition(position) {
+          this.position.y = position;
+        }
+
+        respawn({ position }) {
+          if (!this.isDead) {
+            this.jump();
+            this.isDead = true;
+            setTimeout(() => {
+              this.position = { x: 150, y: 300 };
+              this.isDead = false;
+            }, 1000);
+          }
+        }
+
+        // method to detect is landed on a platform
+        detectPlatform() {
+          for (const platform of this.platforms) {
+            if (
+              this.getRightPosition() > platform.getLeftPosition() &&
+              this.getLeftPosition() < platform.getRightPosition() &&
+              this.getBottomPosition() <= platform.getTopPosition() &&
+              this.getBottomPosition() + this.velocity.y >=
+                platform.getTopPosition()
+            ) {
+              this.velocity.y = 0;
+              this.setBottomPosition(platform.getTopPosition());
+              this.isGrounded = true;
+              return;
+            }
+          }
+          this.isGrounded = false;
+        }
+
+        // method to apply gravity to the player
+        applyGravity() {
+          if (!this.isGrounded) {
+            // update y position
+            this.position.y += this.velocity.y;
+            // add gravity to velocity
+            this.velocity.y += this.gravity;
+          }
+          // stop when hitting canvas bottom
+          if (this.position.y >= this.canvas.el.height) {
+            this.respawn({ position: { x: 150, y: 300 } });
+          }
+        }
+
+        jump() {
+          this.velocity.y = -this.jumpHeight;
+          this.position.y += this.velocity.y;
+          this.isGrounded = false;
+        }
+
+        moveRight() {
+          this.currentSpeed += this.runAcceleration;
+
+          // limit speed to maxRunSpeed
+          if (this.currentSpeed > this.maxRunSpeed) {
+            this.currentSpeed = this.maxRunSpeed;
+          }
+
+          // speed up deceleration if moving left whilst pressing right
+          if (this.currentSpeed < 0) {
+            this.currentSpeed += this.runAcceleration;
+          }
+
+          this.position.x += this.currentSpeed;
+        }
+
+        moveLeft() {
+          this.currentSpeed -= this.runAcceleration;
+
+          // limit speed to maxRunSpeed
+          if (this.currentSpeed < -this.maxRunSpeed) {
+            this.currentSpeed = -this.maxRunSpeed;
+          }
+
+          // speed up deceleration if moving right whilst pressing left
+          if (this.currentSpeed > 0) {
+            this.currentSpeed -= this.runAcceleration;
+          }
+
+          this.position.x += this.currentSpeed;
+        }
+
+        decelerate() {
+          if (this.currentSpeed > 1) {
+            this.currentSpeed -= this.runAcceleration;
+          } else if (this.currentSpeed < -1) {
+            this.currentSpeed += this.runAcceleration;
+          } else {
+            this.currentSpeed = 0;
+          }
+
+          this.position.x += this.currentSpeed;
+        }
+
+        // method to move the player
+        move() {
+          // jump code
+          if (this.keysHandler.keys.includes("ArrowUp") && this.isGrounded) {
+            this.jump();
+          }
+          // stop moving left at the end of the screen
+          if (this.getLeftPosition() + this.currentSpeed < 0) {
+            this.setLeftPosition(0);
+            this.currentSpeed = 0;
+            return;
+          }
+          // stop moving right at the end of the screen
+          if (
+            this.getRightPosition() + this.currentSpeed >
+            this.canvas.el.width
+          ) {
+            this.setRightPosition(this.canvas.el.width);
+            this.currentSpeed = 0;
+            return;
+          }
+          // move right
+          if (
+            this.keysHandler.keys.includes("ArrowRight") &&
+            !this.keysHandler.keys.includes("ArrowLeft") &&
+            this.getRightPosition() < this.canvas.el.width
+          ) {
+            this.moveRight();
+          }
+          // move left
+          if (
+            this.keysHandler.keys.includes("ArrowLeft") &&
+            !this.keysHandler.keys.includes("ArrowRight") &&
+            this.getLeftPosition() > 0
+          ) {
+            this.moveLeft();
+          }
+          // no move left or right
+          if (
+            (!this.keysHandler.keys.includes("ArrowRight") &&
+              !this.keysHandler.keys.includes("ArrowLeft")) ||
+            (this.keysHandler.keys.includes("ArrowRight") &&
+              this.keysHandler.keys.includes("ArrowLeft"))
+          ) {
+            this.decelerate();
+          }
+        }
+      }
+
+      class Platform {
+        constructor({ position, height, width, canvas }) {
+          this.position = position;
+          this.height = height;
+          this.width = width;
+          this.canvas = canvas;
+        }
+
+        getRightPosition() {
+          return this.position.x + this.width;
+        }
+
+        getLeftPosition() {
+          return this.position.x;
+        }
+
+        getBottomPosition() {
+          return this.position.y + this.height;
+        }
+
+        getTopPosition() {
+          return this.position.y;
+        }
+
+        draw() {
+          this.canvas.ctx.fillStyle = "RGBA(0, 0, 0, 0.3)";
+          this.canvas.ctx.strokeStyle = "black";
+          this.canvas.ctx.fillRect(
+            this.position.x,
+            this.position.y,
+            this.width,
+            this.height
+          );
+        }
+      }
+
+      class Canvas {
+        constructor() {
+          this.el = document.getElementById("my-canvas");
+          this.el.width = 800;
+          this.el.height = 400;
+          this.el.style.border = "1px solid black";
+          this.ctx = this.el.getContext("2d");
+        }
+
+        // method to clear the canvas
+        clearCanvas() {
+          this.ctx.clearRect(0, 0, this.el.width, this.el.height);
+        }
+      }
+      class KeysHandler {
+        constructor() {
+          this.keys = [];
+
+          // key down event listener
+          document.addEventListener("keydown", (e) => {
+            // track keys pressed
+            if (!this.keys.includes(e.key)) {
+              this.keys.push(e.key);
+            }
+          });
+
+          // kep up event listener
+          document.addEventListener("keyup", (e) => {
+            // track keys pressed
+            const index = this.keys.indexOf(e.key);
+            this.keys.splice(index, 1);
+          });
+        }
+      }
+
+      const canvas = new Canvas();
+      const keysHandler = new KeysHandler();
+
+      // create platforms
+      const platforms = [
+        new Platform({
+          position: { x: 0, y: 390 },
+          width: 500,
+          height: 20,
+          canvas,
+        }),
+        new Platform({
+          position: { x: 600, y: 390 },
+          width: 800,
+          height: 20,
+          canvas,
+        }),
+        new Platform({
+          position: { x: 475, y: 320 },
+          width: 100,
+          height: 20,
+          canvas,
+        }),
+        new Platform({
+          position: { x: 675, y: 320 },
+          width: 100,
+          height: 20,
+          canvas,
+        }),
+      ];
+
+      // create player
+      const player = new Player({
+        position: { x: 150, y: 300 },
+        platforms,
+        canvas,
+        keysHandler,
+      });
+
+      // create game
+      const game = new Game(platforms, player, canvas);
+
+      game.init();
+    </script>
+  </body>
+</html>
