@@ -1,5 +1,6 @@
 export default class Game {
   constructor(platforms, player, canvas) {
+    this.level = 1;
     this.platforms = platforms;
     this.player = player;
     this.gravity = 1.2;
@@ -10,10 +11,16 @@ export default class Game {
     this.now; // for fps calculation
     this.elapsed; // for fps calculation
     this.canvas = canvas;
+    this.display = {
+      speed: document.getElementById("display--speed"),
+      positionX: document.getElementById("display--position-x"),
+      scrollX: document.getElementById("display--scroll-x"),
+    };
   }
 
   // method to initiate the game
-  init() {
+  init(level) {
+    this.level = level;
     // get fps interval in ms
     this.fpsInterval = 1000 / this.fps;
     //   // set last and start frame time to now
@@ -21,6 +28,12 @@ export default class Game {
     this.startTime = this.last;
 
     this.animate();
+  }
+
+  updateStatusDisplay() {
+    this.display.speed.textContent = `Speed: ${this.player.currentSpeed}`;
+    this.display.positionX.textContent = `Position X: ${this.player.position.x}`;
+    this.display.scrollX.textContent = `Scroll X: ${this.canvas.scrollOffsetX}`;
   }
 
   // method to stabilise the framerate
@@ -53,5 +66,7 @@ export default class Game {
     this.platforms.forEach((platform) => platform.draw());
 
     this.player.update();
+
+    this.updateStatusDisplay();
   }
 }

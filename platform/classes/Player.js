@@ -5,6 +5,7 @@ export default class Player {
     this.gravity = 1.2;
     this.keysHandler = keysHandler;
     this.position = position;
+    this.positionLimits = { lowerX: 200, upperX: 400 };
     this.width = width || 20;
     this.height = height || 30;
     this.fillStyle = "RGBA(0, 255, 0, 0.5)";
@@ -21,17 +22,12 @@ export default class Player {
   update() {
     this.detectPlatform();
 
-    console.log(this.position.x);
-    console.log(this.canvas.scrollOffsetX);
-    console.log(this.currentSpeed);
-
     if (!this.isGrounded) this.applyGravity();
 
     this.draw();
     this.move();
   }
 
-  // method to draw the player
   draw() {
     this.canvas.ctx.fillStyle = this.fillStyle;
     this.canvas.ctx.strokeStyle = "black";
@@ -109,15 +105,13 @@ export default class Player {
     this.isGrounded = false;
   }
 
-  // method to apply gravity to the player
   applyGravity() {
     if (!this.isGrounded) {
-      // update y position
       this.position.y += this.velocity.y;
-      // add gravity to velocity
+
       this.velocity.y += this.gravity;
     }
-    // stop when hitting canvas bottom
+
     if (this.position.y >= this.canvas.el.height) {
       this.respawn({ position: { x: 200, y: 300 } });
     }
@@ -129,72 +123,78 @@ export default class Player {
     this.isGrounded = false;
   }
 
-  // TODO: deal with move right when hittin left limit
-  moveRight() {
-    this.currentSpeed += this.runAcceleration;
-
-    // limit speed to maxRunSpeed
+  limitSpeedX() {
     if (this.currentSpeed > this.maxRunSpeed) {
       this.currentSpeed = this.maxRunSpeed;
+    } else if (this.currentSpeed < -this.maxRunSpeed) {
+      this.currentSpeed = -this.maxRunSpeed;
+    }
+  }
+
+  skid(speed) {
+    if (speed > 0 && this.currentSpeed < 0) {
+      this.currentSpeed += speed;
+    } else if (speed < 0 && this.currentSpeed > 0) {
+      this.currentSpeed += speed;
+    }
+  }
+
+  updateCurrentSpeed(speed) {
+    this.currentSpeed += speed;
+
+    this.limitSpeedX();
+    this.skid(speed);
+  }
+
+  updatePosition(hitMoveLimit) {
+    if (!hitMoveLimit) {
+      this.position.x += this.currentSpeed;
+      return;
     }
 
-    // speed up deceleration if moving left whilst pressing right
-    if (this.currentSpeed < 0) {
-      this.currentSpeed += this.runAcceleration;
+    this.setLeftPosition(
+      hitMoveLimit === "left"
+        ? this.positionLimits.lowerX
+        : this.positionLimits.upperX
+    );
+
+    if (this.canvas.scrollOffsetX + this.currentSpeed <= 0) {
+      this.currentSpeed = 0;
+      return;
     }
+
+    this.platforms.forEach((platform) => {
+      platform.scrollX(this.currentSpeed);
+    });
+
+    this.canvas.incrementScrollXOffset(this.currentSpeed);
+  }
+
+  moveRight() {
+    this.updateCurrentSpeed(this.runAcceleration);
 
     const hitMoveLimit = this.moveLimitReached();
 
-    if (!hitMoveLimit || hitMoveLimit === "left") {
-      this.position.x += this.currentSpeed;
-    } else if (hitMoveLimit === "right") {
-      // TODO: need propery to hold 400px move limit
-      this.setLeftPosition(400);
+    this.updatePosition(hitMoveLimit);
+  }
 
-      this.platforms.forEach((platform) => {
-        platform.scrollX(this.currentSpeed);
-      });
+  moveLeft() {
+    this.updateCurrentSpeed(-this.runAcceleration);
 
-      this.canvas.scrollOffsetX += this.currentSpeed;
-    }
+    const hitMoveLimit = this.moveLimitReached();
+
+    this.updatePosition(hitMoveLimit);
   }
 
   moveLimitReached() {
-    if (this.position.x + this.currentSpeed >= 400) {
+    if (this.position.x + this.currentSpeed >= this.positionLimits.upperX) {
       return "right";
-    } else if (this.position.x + this.currentSpeed <= 200) {
+    } else if (
+      this.position.x + this.currentSpeed <=
+      this.positionLimits.lowerX
+    ) {
       return "left";
     } else return false;
-  }
-
-  // TODO: deal with move left when hittin right limit
-  moveLeft() {
-    this.currentSpeed -= this.runAcceleration;
-
-    // limit speed to maxRunSpeed
-    if (this.currentSpeed < -this.maxRunSpeed) {
-      this.currentSpeed = -this.maxRunSpeed;
-    }
-
-    // speed up deceleration if moving right whilst pressing left
-    if (this.currentSpeed > 0) {
-      this.currentSpeed -= this.runAcceleration;
-    }
-
-    const hitMoveLimit = this.moveLimitReached();
-
-    if (!hitMoveLimit || hitMoveLimit === "right") {
-      this.position.x += this.currentSpeed;
-    } else if (hitMoveLimit === "left") {
-      // TODO: need propery to hold 200px move limit
-      this.setLeftPosition(200);
-
-      this.platforms.forEach((platform) => {
-        platform.scrollX(this.currentSpeed);
-      });
-
-      this.canvas.scrollOffsetX += this.currentSpeed;
-    }
   }
 
   decelerate() {
@@ -208,50 +208,16 @@ export default class Player {
 
     const hitMoveLimit = this.moveLimitReached();
 
-    if (!hitMoveLimit) {
-      this.position.x += this.currentSpeed;
-    } else if (hitMoveLimit === "right") {
-      // TODO: need propery to hold 400px move limit
-      this.setLeftPosition(400);
-
-      this.platforms.forEach((platform) => {
-        platform.scrollX(this.currentSpeed);
-      });
-
-      this.canvas.scrollOffsetX += this.currentSpeed;
-    } else if (hitMoveLimit === "left") {
-      // TODO: need propery to hold 200px move limit
-      this.setLeftPosition(200);
-
-      this.platforms.forEach((platform) => {
-        platform.scrollX(this.currentSpeed);
-      });
-
-      this.canvas.scrollOffsetX += this.currentSpeed;
-    }
+    this.updatePosition(hitMoveLimit);
   }
 
-  // method to move the player
   move() {
     if (this.isDead) return;
 
-    // jump code
     if (this.keysHandler.keys.includes("ArrowUp") && this.isGrounded) {
       this.jump();
     }
-    // stop moving left at the end of the screen
-    if (this.getLeftPosition() + this.currentSpeed < 0) {
-      this.setLeftPosition(0);
-      this.currentSpeed = 0;
-      return;
-    }
-    // stop moving right at the end of the screen
-    if (this.getRightPosition() + this.currentSpeed > this.canvas.el.width) {
-      this.setRightPosition(this.canvas.el.width);
-      this.currentSpeed = 0;
-      return;
-    }
-    // move right
+
     if (
       this.keysHandler.keys.includes("ArrowRight") &&
       !this.keysHandler.keys.includes("ArrowLeft") &&
@@ -259,7 +225,6 @@ export default class Player {
     ) {
       this.moveRight();
     }
-    // move left
     if (
       this.keysHandler.keys.includes("ArrowLeft") &&
       !this.keysHandler.keys.includes("ArrowRight") &&
@@ -267,7 +232,6 @@ export default class Player {
     ) {
       this.moveLeft();
     }
-    // no move left or right
     if (
       (!this.keysHandler.keys.includes("ArrowRight") &&
         !this.keysHandler.keys.includes("ArrowLeft")) ||

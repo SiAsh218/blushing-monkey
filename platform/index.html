@@ -9,7 +9,23 @@
   </head>
   <body>
     <div class="container">
-      <canvas id="my-canvas"></canvas>
+      <div
+        style="
+          background-color: black;
+          width: 800px;
+          position: absolute;
+          top: 0;
+        "
+      >
+        <div style="display: flex; flex-direction: column">
+          <span id="display--speed" style="color: white">Speed: 0</span>
+          <span id="display--position-x" style="color: white"
+            >Position X: 0</span
+          >
+          <span id="display--scroll-x" style="color: white">Scroll X: 0</span>
+        </div>
+      </div>
+      <canvas id="my-canvas"> </canvas>
     </div>
     <script type="module" src="./script.js"></script>
   </body>

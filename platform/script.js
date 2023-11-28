@@ -46,4 +46,4 @@ const player = new Player({
 // create game
 const game = new Game(platforms, player, canvas);
 
-game.init();
+game.init(1);

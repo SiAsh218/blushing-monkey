@@ -8,6 +8,10 @@ export default class Canvas {
     this.scrollOffsetX = 0;
   }
 
+  incrementScrollXOffset(increment) {
+    this.scrollOffsetX += increment;
+  }
+
   // method to clear the canvas
   clearCanvas() {
     this.ctx.clearRect(0, 0, this.el.width, this.el.height);
