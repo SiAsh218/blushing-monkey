@@ -1,6 +1,7 @@
 export default class Player {
-  constructor({ position, width, height, platforms, canvas, keysHandler }) {
-    this.platforms = platforms;
+  constructor({ position, width, height, canvas, keysHandler }) {
+    this.platforms = undefined;
+    this.blocks = undefined;
     this.canvas = canvas;
     this.gravity = 1.2;
     this.keysHandler = keysHandler;
@@ -8,24 +9,35 @@ export default class Player {
     this.positionLimits = { lowerX: 200, upperX: 400 };
     this.width = width || 20;
     this.height = height || 30;
-    this.fillStyle = "RGBA(0, 255, 0, 0.5)";
+    this.fillStyle = "RGBA(0, 255, 0, 0.75)";
     this.velocity = { x: 0, y: 0 };
     this.lives = 3;
     this.isGrounded = false;
     this.maxRunSpeed = 4;
     this.runAcceleration = 0.2;
-    this.currentSpeed = 0;
-    this.jumpHeight = 15;
+    this.jumpHeight = 11;
+    this.highJumpHeight = 5;
     this.isDead = false;
   }
 
   update() {
+    this.moveX();
+
+    const jumpPressed = this.moveY();
+
     this.detectPlatform();
+
+    this.detectBlockHorizontal();
 
     if (!this.isGrounded) this.applyGravity();
 
+    if (jumpPressed) this.jump();
+
+    this.jumpHigher();
+
+    this.detectBlockVertical();
+
     this.draw();
-    this.move();
   }
 
   draw() {
@@ -37,6 +49,11 @@ export default class Player {
       this.width,
       this.height
     );
+  }
+
+  setLevel(level) {
+    this.platforms = level.platforms;
+    this.blocks = level.blocks;
   }
 
   getRightPosition() {
@@ -81,7 +98,6 @@ export default class Player {
         this.fillStyle = "RGBA(0, 255, 0, 0.5)";
         this.velocity.x = 0;
         this.velocity.y = 0;
-        this.currentSpeed = 0;
         this.isDead = false;
       }, 1000);
     }
@@ -105,6 +121,45 @@ export default class Player {
     this.isGrounded = false;
   }
 
+  detectBlockHorizontal() {
+    for (const block of this.blocks) {
+      if (block.detectCollision(this)) {
+        // TRAVELLING LEFT
+        if (this.velocity.x < 0) {
+          this.velocity.x = 0;
+          this.setLeftPosition(block.getRightPosition());
+          break;
+        }
+        // TRAVELLING RIGHT
+        if (this.velocity.x > 0) {
+          this.velocity.x = 0;
+          this.setRightPosition(block.getLeftPosition());
+          break;
+        }
+      }
+    }
+  }
+
+  detectBlockVertical() {
+    for (const block of this.blocks) {
+      if (block.detectCollision(this)) {
+        // TRAVELLING UP
+        if (this.velocity.y < 0) {
+          this.velocity.y = 0;
+          this.setTopPosition(block.getBottomPosition());
+          break;
+        }
+        // TRAVELLING DOWN
+        if (this.velocity.y > 0) {
+          this.velocity.y = 0;
+          this.setBottomPosition(block.getTopPosition());
+          this.isGrounded = true;
+          break;
+        }
+      }
+    }
+  }
+
   applyGravity() {
     if (!this.isGrounded) {
       this.position.y += this.velocity.y;
@@ -121,26 +176,38 @@ export default class Player {
     this.velocity.y = -this.jumpHeight;
     this.position.y += this.velocity.y;
     this.isGrounded = false;
+    this.keysHandler.jumpStart();
+    this.highJump = false;
+  }
+
+  jumpHigher() {
+    if (!this.isGrounded && this.keysHandler.keys.includes("ArrowUp")) {
+      this.keysHandler.incrementJumpCounter();
+      if (this.keysHandler.getJumpPressDur() > 4 && !this.highJump) {
+        this.velocity.y -= this.highJumpHeight;
+        this.highJump = true;
+      }
+    }
   }
 
   limitSpeedX() {
-    if (this.currentSpeed > this.maxRunSpeed) {
-      this.currentSpeed = this.maxRunSpeed;
-    } else if (this.currentSpeed < -this.maxRunSpeed) {
-      this.currentSpeed = -this.maxRunSpeed;
+    if (this.velocity.x > this.maxRunSpeed) {
+      this.velocity.x = this.maxRunSpeed;
+    } else if (this.velocity.x < -this.maxRunSpeed) {
+      this.velocity.x = -this.maxRunSpeed;
     }
   }
 
   skid(speed) {
-    if (speed > 0 && this.currentSpeed < 0) {
-      this.currentSpeed += speed;
-    } else if (speed < 0 && this.currentSpeed > 0) {
-      this.currentSpeed += speed;
+    if (speed > 0 && this.velocity.x < 0) {
+      this.velocity.x += speed;
+    } else if (speed < 0 && this.velocity.x > 0) {
+      this.velocity.x += speed;
     }
   }
 
   updateCurrentSpeed(speed) {
-    this.currentSpeed += speed;
+    this.velocity.x += speed;
 
     this.limitSpeedX();
     this.skid(speed);
@@ -148,7 +215,7 @@ export default class Player {
 
   updatePosition(hitMoveLimit) {
     if (!hitMoveLimit) {
-      this.position.x += this.currentSpeed;
+      this.position.x += this.velocity.x;
       return;
     }
 
@@ -158,16 +225,24 @@ export default class Player {
         : this.positionLimits.upperX
     );
 
-    if (this.canvas.scrollOffsetX + this.currentSpeed <= 0) {
-      this.currentSpeed = 0;
+    if (this.canvas.scrollOffsetX + this.velocity.x <= 0) {
+      this.velocity.x = 0;
       return;
     }
 
+    this.scrollLevel();
+  }
+
+  scrollLevel() {
     this.platforms.forEach((platform) => {
-      platform.scrollX(this.currentSpeed);
+      platform.scrollX(this.velocity.x);
     });
 
-    this.canvas.incrementScrollXOffset(this.currentSpeed);
+    this.blocks.forEach((block) => {
+      block.scrollX(this.velocity.x);
+    });
+
+    this.canvas.incrementScrollXOffset(this.velocity.x);
   }
 
   moveRight() {
@@ -187,10 +262,10 @@ export default class Player {
   }
 
   moveLimitReached() {
-    if (this.position.x + this.currentSpeed >= this.positionLimits.upperX) {
+    if (this.position.x + this.velocity.x >= this.positionLimits.upperX) {
       return "right";
     } else if (
-      this.position.x + this.currentSpeed <=
+      this.position.x + this.velocity.x <=
       this.positionLimits.lowerX
     ) {
       return "left";
@@ -198,12 +273,12 @@ export default class Player {
   }
 
   decelerate() {
-    if (this.currentSpeed > 1) {
-      this.currentSpeed -= this.runAcceleration;
-    } else if (this.currentSpeed < -1) {
-      this.currentSpeed += this.runAcceleration;
+    if (this.velocity.x > 1) {
+      this.velocity.x -= this.runAcceleration;
+    } else if (this.velocity.x < -1) {
+      this.velocity.x += this.runAcceleration;
     } else {
-      this.currentSpeed = 0;
+      this.velocity.x = 0;
     }
 
     const hitMoveLimit = this.moveLimitReached();
@@ -211,12 +286,14 @@ export default class Player {
     this.updatePosition(hitMoveLimit);
   }
 
-  move() {
-    if (this.isDead) return;
-
+  moveY() {
     if (this.keysHandler.keys.includes("ArrowUp") && this.isGrounded) {
-      this.jump();
-    }
+      return true;
+    } else return false;
+  }
+
+  moveX() {
+    if (this.isDead) return;
 
     if (
       this.keysHandler.keys.includes("ArrowRight") &&

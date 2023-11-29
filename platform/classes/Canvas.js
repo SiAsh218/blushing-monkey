@@ -1,4 +1,4 @@
-export default class Canvas {
+class Canvas {
   constructor() {
     this.el = document.getElementById("my-canvas");
     this.el.width = 800;
@@ -17,3 +17,5 @@ export default class Canvas {
     this.ctx.clearRect(0, 0, this.el.width, this.el.height);
   }
 }
+
+export default new Canvas();

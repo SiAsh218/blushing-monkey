@@ -1,8 +1,11 @@
+import level1 from "../levels/Level1.js";
+
 export default class Game {
-  constructor(platforms, player, canvas) {
+  constructor(player, canvas) {
     this.level = 1;
-    this.platforms = platforms;
+    this.levels = [level1];
     this.player = player;
+    this.player.setLevel(this.levels[this.level - 1]);
     this.gravity = 1.2;
     this.fps = 60; // for fps calculation
     this.fpsInterval; // for fps calculation
@@ -31,9 +34,19 @@ export default class Game {
   }
 
   updateStatusDisplay() {
-    this.display.speed.textContent = `Speed: ${this.player.currentSpeed}`;
-    this.display.positionX.textContent = `Position X: ${this.player.position.x}`;
-    this.display.scrollX.textContent = `Scroll X: ${this.canvas.scrollOffsetX}`;
+    const roundNum = (num) => {
+      return Math.round(num * 100) / 100;
+    };
+
+    this.display.speed.textContent = `Velocity X: ${roundNum(
+      this.player.velocity.x
+    )}, Velocity Y: ${roundNum(this.player.velocity.y)}`;
+    this.display.positionX.textContent = `Position X: ${roundNum(
+      this.player.position.x
+    )}`;
+    this.display.scrollX.textContent = `Scroll X: ${roundNum(
+      this.canvas.scrollOffsetX
+    )}`;
   }
 
   // method to stabilise the framerate
@@ -63,7 +76,11 @@ export default class Game {
 
     this.canvas.clearCanvas();
 
-    this.platforms.forEach((platform) => platform.draw());
+    this.levels[this.level - 1].platforms.forEach((platform) =>
+      platform.draw()
+    );
+
+    this.levels[this.level - 1].blocks.forEach((block) => block.draw());
 
     this.player.update();
 
