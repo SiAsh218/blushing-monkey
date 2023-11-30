@@ -12,6 +12,10 @@ class Canvas {
     this.scrollOffsetX += increment;
   }
 
+  setScrollXOffset(val) {
+    this.scrollOffsetX = val;
+  }
+
   // method to clear the canvas
   clearCanvas() {
     this.ctx.clearRect(0, 0, this.el.width, this.el.height);

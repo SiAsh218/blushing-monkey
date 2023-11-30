@@ -5,7 +5,6 @@ export default class Game {
     this.level = 1;
     this.levels = [level1];
     this.player = player;
-    this.player.setLevel(this.levels[this.level - 1]);
     this.gravity = 1.2;
     this.fps = 60; // for fps calculation
     this.fpsInterval; // for fps calculation
@@ -29,6 +28,10 @@ export default class Game {
     //   // set last and start frame time to now
     this.last = Date.now();
     this.startTime = this.last;
+    this.player.setLevel(this.levels[this.level - 1]);
+    this.player.position = JSON.parse(
+      JSON.stringify(this.levels[this.level - 1].startPosition)
+    );
 
     this.animate();
   }
@@ -81,6 +84,8 @@ export default class Game {
     );
 
     this.levels[this.level - 1].blocks.forEach((block) => block.draw());
+
+    this.levels[this.level - 1].finishLine.draw();
 
     this.player.update();
 

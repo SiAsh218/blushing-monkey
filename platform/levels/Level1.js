@@ -2,11 +2,22 @@ import Level from "./Level.js";
 import canvas from "../classes/Canvas.js";
 import Platform from "../classes/Platform.js";
 import Block from "../classes/Block.js";
+import FinishLine from "../classes/FinishLine.js";
 
 class Level1 extends Level {
   constructor() {
     super();
 
+    this.startPosition = { x: 200, y: 300 };
+
+    this.setPlatforms();
+
+    this.setBlocks();
+
+    this.setFinishLine();
+  }
+
+  setPlatforms() {
     this.platforms = [
       new Platform({
         position: { x: 475, y: 340 },
@@ -39,7 +50,9 @@ class Level1 extends Level {
         canvas,
       }),
     ];
+  }
 
+  setBlocks() {
     this.blocks = [
       new Block({
         position: { x: 0, y: 390 },
@@ -90,6 +103,25 @@ class Level1 extends Level {
         canvas,
       }),
     ];
+  }
+
+  setFinishLine() {
+    this.finishLine = new FinishLine({
+      position: { x: 3030, y: 210 },
+      width: 50,
+      height: 200,
+      canvas,
+    });
+  }
+
+  resetLevel() {
+    this.setPlatforms();
+    this.setBlocks();
+    this.setFinishLine();
+  }
+
+  getStartPosition() {
+    return this.startPosition;
   }
 }
 

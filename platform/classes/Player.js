@@ -1,7 +1,6 @@
 export default class Player {
   constructor({ position, width, height, canvas, keysHandler }) {
-    this.platforms = undefined;
-    this.blocks = undefined;
+    this.level = undefined;
     this.canvas = canvas;
     this.gravity = 1.2;
     this.keysHandler = keysHandler;
@@ -13,10 +12,15 @@ export default class Player {
     this.velocity = { x: 0, y: 0 };
     this.lives = 3;
     this.isGrounded = false;
-    this.maxRunSpeed = 4;
+    this.sprintSpeed = 6;
+    this.runSpeed = 4;
+    this.currentSpeed = 4;
+    this.sprintAcceleration = 0.3;
     this.runAcceleration = 0.2;
+    this.currentAcceleration = 0.2;
     this.jumpHeight = 11;
     this.highJumpHeight = 5;
+    this.jumpLongPress = 4;
     this.isDead = false;
   }
 
@@ -37,6 +41,8 @@ export default class Player {
 
     this.detectBlockVertical();
 
+    this.detectFinishLine();
+
     this.draw();
   }
 
@@ -52,8 +58,7 @@ export default class Player {
   }
 
   setLevel(level) {
-    this.platforms = level.platforms;
-    this.blocks = level.blocks;
+    this.level = level;
   }
 
   getRightPosition() {
@@ -94,8 +99,10 @@ export default class Player {
       this.isDead = true;
       this.fillStyle = "RGBA(0, 255, 0, 0.2)";
       setTimeout(() => {
+        this.canvas.setScrollXOffset(0);
         this.position = position;
         this.fillStyle = "RGBA(0, 255, 0, 0.5)";
+        this.level.resetLevel();
         this.velocity.x = 0;
         this.velocity.y = 0;
         this.isDead = false;
@@ -103,60 +110,63 @@ export default class Player {
     }
   }
 
-  // method to detect is landed on a platform
+  setGrounded(item) {
+    if (item) {
+      this.velocity.y = 0;
+      this.setBottomPosition(item.getTopPosition());
+      this.isGrounded = true;
+    } else {
+      this.isGrounded = false;
+    }
+  }
+
   detectPlatform() {
-    for (const platform of this.platforms) {
-      if (
-        this.getRightPosition() > platform.getLeftPosition() &&
-        this.getLeftPosition() < platform.getRightPosition() &&
-        this.getBottomPosition() <= platform.getTopPosition() &&
-        this.getBottomPosition() + this.velocity.y >= platform.getTopPosition()
-      ) {
-        this.velocity.y = 0;
-        this.setBottomPosition(platform.getTopPosition());
-        this.isGrounded = true;
+    for (const platform of this.level.platforms) {
+      const detected = platform.detectPlayer(this);
+
+      if (detected) {
+        this.setGrounded(platform);
         return;
       }
     }
-    this.isGrounded = false;
+
+    this.setGrounded(false);
   }
 
   detectBlockHorizontal() {
-    for (const block of this.blocks) {
-      if (block.detectCollision(this)) {
-        // TRAVELLING LEFT
-        if (this.velocity.x < 0) {
-          this.velocity.x = 0;
-          this.setLeftPosition(block.getRightPosition());
-          break;
-        }
-        // TRAVELLING RIGHT
-        if (this.velocity.x > 0) {
-          this.velocity.x = 0;
-          this.setRightPosition(block.getLeftPosition());
-          break;
-        }
+    for (const block of this.level.blocks) {
+      const collision = block.detectPlayerHorizontal(this);
+
+      if (collision) {
+        this.velocity.x > 0
+          ? this.setRightPosition(block.getLeftPosition())
+          : this.setLeftPosition(block.getRightPosition());
+        this.velocity.x = 0;
       }
     }
   }
 
   detectBlockVertical() {
-    for (const block of this.blocks) {
-      if (block.detectCollision(this)) {
-        // TRAVELLING UP
+    for (const block of this.level.blocks) {
+      const collision = block.detectPlayerVertical(this);
+
+      if (collision) {
         if (this.velocity.y < 0) {
           this.velocity.y = 0;
           this.setTopPosition(block.getBottomPosition());
-          break;
-        }
-        // TRAVELLING DOWN
-        if (this.velocity.y > 0) {
-          this.velocity.y = 0;
-          this.setBottomPosition(block.getTopPosition());
-          this.isGrounded = true;
-          break;
+        } else {
+          this.setGrounded(block);
         }
       }
+    }
+  }
+
+  detectFinishLine() {
+    if (this.getRightPosition() > this.level.finishLine.getLeftPosition()) {
+      this.keysHandler.disableInput();
+      this.velocity.x = 0;
+      this.velocity.y = 0;
+      // TODO: code to go to next level
     }
   }
 
@@ -168,22 +178,28 @@ export default class Player {
     }
 
     if (this.position.y >= this.canvas.el.height) {
-      this.respawn({ position: { x: 200, y: 300 } });
+      this.respawn({
+        position: JSON.parse(JSON.stringify(this.level.startPosition)),
+      });
     }
   }
 
   jump() {
     this.velocity.y = -this.jumpHeight;
     this.position.y += this.velocity.y;
-    this.isGrounded = false;
     this.keysHandler.jumpStart();
+    this.isGrounded = false;
     this.highJump = false;
   }
 
   jumpHigher() {
     if (!this.isGrounded && this.keysHandler.keys.includes("ArrowUp")) {
       this.keysHandler.incrementJumpCounter();
-      if (this.keysHandler.getJumpPressDur() > 4 && !this.highJump) {
+      if (
+        this.keysHandler.jumpPressed &&
+        this.keysHandler.getJumpPressDur() > this.jumpLongPress &&
+        !this.highJump
+      ) {
         this.velocity.y -= this.highJumpHeight;
         this.highJump = true;
       }
@@ -191,10 +207,10 @@ export default class Player {
   }
 
   limitSpeedX() {
-    if (this.velocity.x > this.maxRunSpeed) {
-      this.velocity.x = this.maxRunSpeed;
-    } else if (this.velocity.x < -this.maxRunSpeed) {
-      this.velocity.x = -this.maxRunSpeed;
+    if (this.velocity.x > this.currentSpeed) {
+      this.velocity.x = this.currentSpeed;
+    } else if (this.velocity.x < -this.currentSpeed) {
+      this.velocity.x = -this.currentSpeed;
     }
   }
 
@@ -234,19 +250,21 @@ export default class Player {
   }
 
   scrollLevel() {
-    this.platforms.forEach((platform) => {
+    this.level.platforms.forEach((platform) => {
       platform.scrollX(this.velocity.x);
     });
 
-    this.blocks.forEach((block) => {
+    this.level.blocks.forEach((block) => {
       block.scrollX(this.velocity.x);
     });
+
+    this.level.finishLine.scrollX(this.velocity.x);
 
     this.canvas.incrementScrollXOffset(this.velocity.x);
   }
 
   moveRight() {
-    this.updateCurrentSpeed(this.runAcceleration);
+    this.updateCurrentSpeed(this.currentAcceleration);
 
     const hitMoveLimit = this.moveLimitReached();
 
@@ -254,7 +272,7 @@ export default class Player {
   }
 
   moveLeft() {
-    this.updateCurrentSpeed(-this.runAcceleration);
+    this.updateCurrentSpeed(-this.currentAcceleration);
 
     const hitMoveLimit = this.moveLimitReached();
 
@@ -274,9 +292,9 @@ export default class Player {
 
   decelerate() {
     if (this.velocity.x > 1) {
-      this.velocity.x -= this.runAcceleration;
+      this.velocity.x -= this.currentAcceleration;
     } else if (this.velocity.x < -1) {
-      this.velocity.x += this.runAcceleration;
+      this.velocity.x += this.currentAcceleration;
     } else {
       this.velocity.x = 0;
     }
@@ -292,8 +310,27 @@ export default class Player {
     } else return false;
   }
 
+  setSprintSpeed() {
+    this.currentSpeed = this.sprintSpeed;
+    this.currentAcceleration = this.sprintAcceleration;
+  }
+
+  setRunSpeed() {
+    this.currentAcceleration = this.runAcceleration;
+    this.currentSpeed -= this.currentAcceleration;
+    if (this.currentSpeed < this.runSpeed) {
+      this.currentSpeed = this.runSpeed;
+    }
+  }
+
   moveX() {
     if (this.isDead) return;
+
+    if (this.keysHandler.keys.includes("Shift")) {
+      this.setSprintSpeed();
+    } else {
+      this.setRunSpeed();
+    }
 
     if (
       this.keysHandler.keys.includes("ArrowRight") &&

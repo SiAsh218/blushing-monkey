@@ -38,6 +38,31 @@ export default class Block {
     return false;
   }
 
+  detectPlayerHorizontal(player) {
+    if (this.detectCollision(player)) {
+      return true;
+    }
+    return false;
+  }
+
+  detectPlayerVertical(player) {
+    if (this.detectCollision(player)) {
+      return true;
+      // TRAVELLING UP
+      // if (player.velocity.y < 0) {
+      //   player.velocity.y = 0;
+      //   player.setTopPosition(this.getBottomPosition());
+      // }
+      // // TRAVELLING DOWN
+      // if (player.velocity.y > 0) {
+      //   player.velocity.y = 0;
+      //   player.setBottomPosition(this.getTopPosition());
+      //   player.isGrounded = true;
+      // }
+    }
+    return false;
+  }
+
   draw() {
     this.canvas.ctx.fillStyle = "RGBA(125,42,42, 0.5)";
     this.canvas.ctx.strokeStyle = "black";

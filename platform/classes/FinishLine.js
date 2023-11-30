@@ -1,4 +1,4 @@
-export default class Platform {
+export default class FinishLine {
   constructor({ position, height, width, canvas }) {
     this.position = position;
     this.height = height;
@@ -27,7 +27,7 @@ export default class Platform {
   }
 
   draw() {
-    this.canvas.ctx.fillStyle = "RGBA(0, 0, 0, 0.3)";
+    this.canvas.ctx.fillStyle = "RGBA(237, 233, 157, 0.3)";
     this.canvas.ctx.strokeStyle = "black";
     this.canvas.ctx.fillRect(
       this.position.x,
@@ -35,18 +35,5 @@ export default class Platform {
       this.width,
       this.height
     );
-  }
-
-  detectPlayer(player) {
-    if (
-      player.getRightPosition() > this.getLeftPosition() &&
-      player.getLeftPosition() < this.getRightPosition() &&
-      player.getBottomPosition() <= this.getTopPosition() &&
-      player.getBottomPosition() + player.velocity.y >= this.getTopPosition()
-    ) {
-      return true;
-    }
-
-    return false;
   }
 }

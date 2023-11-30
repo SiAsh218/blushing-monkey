@@ -3,9 +3,12 @@ export default class KeysHandler {
     this.keys = [];
     this.jumpPressed = false;
     this.jumpPressedDur = 0;
+    this.allowInput = true;
 
     // key down event listener
     document.addEventListener("keydown", (e) => {
+      if (!this.allowInput) return;
+
       // track keys pressed
       if (!this.keys.includes(e.key)) {
         this.keys.push(e.key);
@@ -14,6 +17,8 @@ export default class KeysHandler {
 
     // kep up event listener
     document.addEventListener("keyup", (e) => {
+      if (!this.allowInput) return;
+
       // track keys pressed
       const index = this.keys.indexOf(e.key);
       this.keys.splice(index, 1);
@@ -36,5 +41,14 @@ export default class KeysHandler {
 
   incrementJumpCounter() {
     this.jumpPressDur++;
+  }
+
+  disableInput() {
+    this.allowInput = false;
+    this.keys = [];
+  }
+
+  enableInput() {
+    this.allowInput = true;
   }
 }
